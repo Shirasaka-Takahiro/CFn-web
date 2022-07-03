@@ -71,11 +71,11 @@ Resources:
           - Key: Name
             Value: !Sub "${PJPrefix}-web-private-1a"
 
-### Public-Instance-1c ###
+### Nat-Instance-1c ###
   EC2Public1C: 
     Type: AWS::EC2::Instance
     Properties: 
-      ImageId: ami-032d6db78f84e8bf5
+      ImageId: ami-0027bce0a302ff265
       InstanceType: t2.micro
       KeyName: !Ref KeyName
       NetworkInterfaces: 
@@ -93,34 +93,7 @@ Resources:
           sudo systemctl enable httpd
       Tags:
           - Key: Name
-            Value: !Sub "${PJPrefix}-web-public-1c"
-
-### Private-Instance-1a ###
-  EC2Private1C: 
-    Type: AWS::EC2::Instance
-    Properties: 
-      ImageId: ami-032d6db78f84e8bf5
-      InstanceType: t2.micro
-      KeyName: !Ref KeyName
-      NetworkInterfaces: 
-        - AssociatePublicIpAddress: "true"
-          DeviceIndex: "0"
-          SubnetId: { "Fn::ImportValue": !Sub "${PJPrefix}-private-subnet-c" }
-          GroupSet:
-            - { "Fn::ImportValue": !Sub "${PJPrefix}-web-private-sg" }
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash
-          yum -y install git
-          yum -y update
-          yum -y localinstall http://dev.mysql.com/get/mysql80-community-release-el7-5.noarch.rpm
-          yum -y install mysql-community-server
-          yum -y install mysql-community-client
-          systemctl start mysqld.service
-          systemctl enable mysqld.service
-      Tags:
-          - Key: Name
-            Value: !Sub "${PJPrefix}-web-private-1c"
+            Value: !Sub "${PJPrefix}-web-public-nat-1c"
 
 
 # ------------------------------------------------------------
@@ -227,7 +200,3 @@ Outputs:
     Value: !Ref EC2Public1C
     Export:
       Name: !Sub "${PJPrefix}-web-public-1c"
-  EC2Private1C:
-    Value: !Ref EC2Private1C
-    Export:
-      Name: !Sub "${PJPrefix}-web-private-1c"

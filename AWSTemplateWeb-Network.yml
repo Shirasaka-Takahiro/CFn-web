@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Web-Template
+Description: Web-Template-Network
 
 
 # ------------------------------------------------------------
@@ -202,7 +202,7 @@ Resources:
     Properties: 
       RouteTableId: !Ref PrivateARTB
       DestinationCidrBlock: "0.0.0.0/0"
-      NatGatewayId: !Ref NatGateway
+      GatewayId: { "Fn::ImportValue": !Sub "${PJPrefix}-web-public-1a" }
 
 ### Private Subnet C Routing ###
   PrivateCRTB: 
@@ -224,7 +224,6 @@ Resources:
     Properties: 
       RouteTableId: !Ref PrivateCRTB
       DestinationCidrBlock: "0.0.0.0/0"
-      NatGatewayId: !Ref NatGateway
 
 
 # ------------------------------------------------------------
