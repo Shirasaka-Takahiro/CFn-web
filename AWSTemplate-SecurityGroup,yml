@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Web-Template-SecurityGroup
+
+# ------------------------------------------------------------
+# Input Parameters
+# ------------------------------------------------------------
+Parameters:
+### Project Prefix ###
+  PJPrefix:
+    Type: String
+
+### MyIP ###
+  MyIP:
+    Description: IP address allowed to access EC2
+    Type: String
+
+### Resources ###
+Resources:
+# ------------------------------------------------------------
+# SecurityGroup
+# ------------------------------------------------------------
+### ALB Server Security Group ###
+    ALBSG:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "alb"
+            GroupName: cfn-alb-sg
+            VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" }
+            Tags: 
+                - Key: Name
+                  Value: !Sub "${PJPrefix}-alb-sg"
+            SecurityGroupIngress:
+              - IpProtocol: tcp
+                FromPort : 80
+                ToPort : 80
+                CidrIp: 0.0.0.0/0
+              - IpProtocol: tcp
+                FromPort : 443
+                ToPort : 443
+                CidrIp: 0.0.0.0/0
+
+### Web Server Security Group ###
+    WebPublicSG:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "web-public-sg"
+            GroupName: cfn-web-public-sg
+            VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" }
+            Tags: 
+                - Key: Name
+                  Value: !Sub "${PJPrefix}-web-public-sg"
+            SecurityGroupIngress:
+              - IpProtocol: tcp
+                FromPort : 80
+                ToPort : 80
+                CidrIp: 0.0.0.0/0
+              - IpProtocol: tcp
+                FromPort : 443
+                ToPort : 443
+                CidrIp: 0.0.0.0/0
+              - IpProtocol: tcp
+                FromPort : 22
+                ToPort : 22
+                CidrIp: !Ref MyIP
+
+    WebPrivateSG:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "web-private-sg"
+            GroupName: cfn-web-private-sg
+            VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" }
+            Tags: 
+                - Key: Name
+                  Value: !Sub "${PJPrefix}-web-private-sg"
+            SecurityGroupIngress:
+              - IpProtocol: tcp
+                FromPort : 22
+                ToPort : 22
+                SourceSecurityGroupId: !Ref WebPublicSG
+              - IpProtocol: tcp
+                FromPort : 3306
+                ToPort : 3306
+                SourceSecurityGroupId: !Ref WebPublicSG
+
+### DB Security Group ###            
+    #DBSG:
+    #    Type: "AWS::EC2::SecurityGroup"
+    #    Properties:
+    #        GroupDescription: "mysql"
+    #        GroupName: cfn-db-sg
+    #        VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" }
+    #        Tags: 
+    #            - Key: Name
+    #              Value: !Sub "${PJPrefix}-db-sg"
+    #        SecurityGroupIngress:
+    #            IpProtocol: tcp
+    #            FromPort : 3306
+    #            ToPort : 3306
+    #            SourceSecurityGroupId: !Ref WebPublicSG
+
+
+# ------------------------------------------------------------
+# Output Parameter
+# ------------------------------------------------------------
+Outputs:
+### SecurityGroup ###
+    ALBSG:
+      Value: !Ref ALBSG
+      Export:
+        Name: !Sub "${PJPrefix}-alb-sg"
+    WebPublicSG:
+      Value: !Ref WebPublicSG
+      Export:
+        Name: !Sub "${PJPrefix}-web-public-sg"   
+    WebPrivateSG:
+      Value: !Ref WebPrivateSG
+      Export:
+        Name: !Sub "${PJPrefix}-web-private-sg"
+    DBSG:
+      Value: !Ref DBSG
+      Export:
+        Name: !Sub "${PJPrefix}-db-sg"
