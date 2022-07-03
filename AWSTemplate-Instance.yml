@@ -1,0 +1,233 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Web-Template-Instance
+
+
+# ------------------------------------------------------------
+# Input Parameters
+# ------------------------------------------------------------
+Parameters:
+### Project Prefix ###
+  PJPrefix:
+    Type: String
+### Key pair ###
+  KeyName:
+    Description: input EC2 Keyname
+    Type: 'AWS::EC2::KeyPair::KeyName'
+
+
+### Resources ###
+Resources: 
+# ------------------------------------------------------------
+# EC2
+# ------------------------------------------------------------
+### Public-Instance-1a ###
+  EC2Public1A: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: ami-032d6db78f84e8bf5
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: { "Fn::ImportValue": !Sub "${PJPrefix}-public-subnet-a" }
+          GroupSet:
+            - { "Fn::ImportValue": !Sub "${PJPrefix}-web-public-sg" }
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          sudo yum -y update
+          sudo yum -y install httpd
+          sudo systemctl start httpd
+          sudo systemctl enable httpd
+      Tags:
+          - Key: Name
+            Value: !Sub "${PJPrefix}-web-public-1a"
+
+### Private-Instance-1a ###
+  EC2Private1A: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: ami-032d6db78f84e8bf5
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: { "Fn::ImportValue": !Sub "${PJPrefix}-private-subnet-a" }
+          GroupSet:
+            - { "Fn::ImportValue": !Sub "${PJPrefix}-web-private-sg" }
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum -y install git
+          yum -y update
+          yum -y localinstall http://dev.mysql.com/get/mysql80-community-release-el7-5.noarch.rpm
+          yum -y install mysql-community-server
+          yum -y install mysql-community-client
+          systemctl start mysqld.service
+          systemctl enable mysqld.service
+      Tags:
+          - Key: Name
+            Value: !Sub "${PJPrefix}-web-private-1a"
+
+### Public-Instance-1c ###
+  EC2Public1C: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: ami-032d6db78f84e8bf5
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: { "Fn::ImportValue": !Sub "${PJPrefix}-public-subnet-c" }
+          GroupSet:
+            - { "Fn::ImportValue": !Sub "${PJPrefix}-web-public-sg" }
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          sudo yum -y update
+          sudo yum -y install httpd
+          sudo systemctl start httpd
+          sudo systemctl enable httpd
+      Tags:
+          - Key: Name
+            Value: !Sub "${PJPrefix}-web-public-1c"
+
+### Private-Instance-1a ###
+  EC2Private1C: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: ami-032d6db78f84e8bf5
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: { "Fn::ImportValue": !Sub "${PJPrefix}-private-subnet-c" }
+          GroupSet:
+            - { "Fn::ImportValue": !Sub "${PJPrefix}-web-private-sg" }
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum -y install git
+          yum -y update
+          yum -y localinstall http://dev.mysql.com/get/mysql80-community-release-el7-5.noarch.rpm
+          yum -y install mysql-community-server
+          yum -y install mysql-community-client
+          systemctl start mysqld.service
+          systemctl enable mysqld.service
+      Tags:
+          - Key: Name
+            Value: !Sub "${PJPrefix}-web-private-1c"
+
+
+# ------------------------------------------------------------
+# Target Group
+# ------------------------------------------------------------
+  TargetGroup:
+    Type: "AWS::ElasticLoadBalancingV2::TargetGroup"
+    Properties: 
+      VpcId: { "Fn::ImportValue": !Sub "${PJPrefix}-vpc" } 
+      Name: !Sub "${PJPrefix}-tg"
+      Protocol: HTTP
+      Port: 80
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: "/"
+      HealthCheckPort: "traffic-port"
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      HealthCheckTimeoutSeconds: 5
+      HealthCheckIntervalSeconds: 10
+      Matcher: 
+        HttpCode: 200
+      Tags: 
+        - Key: Name
+          Value: !Sub "${PJPrefix}-${ALB}-tg"
+      TargetGroupAttributes: 
+        - Key: "deregistration_delay.timeout_seconds"
+          Value: 300
+        - Key: "stickiness.enabled"
+          Value: false
+        - Key: "stickiness.type"
+          Value: lb_cookie
+        - Key: "stickiness.lb_cookie.duration_seconds"
+          Value: 86400
+      Targets: 
+        - Id: !Ref EC2WebA
+        - Id: !Ref EC2WebC
+          Port: 80
+
+
+# ------------------------------------------------------------
+# Application Load balancer
+# ------------------------------------------------------------
+### ALB ###
+  ALB: 
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties: 
+      Name: !Sub "${PJPrefix}-alb"
+      Scheme: "internet-facing"
+      LoadBalancerAttributes: 
+        - Key: "deletion_protection.enabled"
+          Value: false
+        - Key: "idle_timeout.timeout_seconds"
+          Value: 4000
+      SecurityGroups:
+        - { "Fn::ImportValue": !Sub "${PJPrefix}-alb-sg" } 
+      Subnets: 
+        - { "Fn::ImportValue": !Sub "${PJPrefix}-public-subnet-a" } 
+        - { "Fn::ImportValue": !Sub "${PJPrefix}-public-subnet-c" }
+
+### Listener HTTP ###
+  ALBListenerHTTP: 
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties: 
+      Port: 80
+      Protocol: HTTP
+      DefaultActions: 
+        - Type: redirect
+          RedirectConfig: 
+            Host: '#{host}'
+            Path: '/#{path}'
+            Port: 443
+            Protocol: HTTPS
+            Query: '#{query}'
+            StatusCode: HTTP_301
+      LoadBalancerArn: !Ref ALB
+
+### Listener HTTPS ###
+  #ALBListenerHTTPS:
+  #  Type: AWS::ElasticLoadBalancingV2::Listener
+  #  Properties:
+  #    Port: 443
+  #    Protocol: HTTPS
+  #    Certificates:
+  #      - CertificateArn: !Ref ACM
+  #    DefaultActions:
+  #      - TargetGroupArn: !Ref TargetGroup
+  #        Type: forward
+  #    LoadBalancerArn: !Ref ALB
+
+# ------------------------------------------------------------
+# Output Parameter
+# ------------------------------------------------------------
+Outputs:
+### EC2 ###
+  EC2Public1A:
+    Value: !Ref EC2Public1A
+    Export:
+      Name: !Sub "${PJPrefix}-web-public-1a"
+  EC2Private1A:
+    Value: !Ref EC2Private1A
+    Export:
+      Name: !Sub "${PJPrefix}-web-private-1a"
+  EC2Public1C:
+    Value: !Ref EC2Public1C
+    Export:
+      Name: !Sub "${PJPrefix}-web-public-1c"
+  EC2Private1C:
+    Value: !Ref EC2Private1C
+    Export:
+      Name: !Sub "${PJPrefix}-web-private-1c"
